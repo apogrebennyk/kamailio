@@ -226,8 +226,9 @@ static struct redis *__redis_connect(struct redis *redis)
 		return NULL;
 	}
 
+	redisReply *reply;
 	if(strlen(redis->password) > 0) {
-		redisReply *reply = redisCommand(redis->ctxt, "AUTH %s", redis->password);
+		reply = redisCommand(redis->ctxt, "AUTH %s", redis->password);
 		if (!reply) {
 			LM_ERR("cannot authenticate connection\n");
 			goto err;
@@ -247,11 +248,11 @@ err:
 	if (reply)
 		freeReplyObject(reply);
 	reply = NULL;
-	if (con->con) {
-		redisFree(con->con);
-		con->con = NULL;
+	if (redis->ctxt) {
+		redisFree(redis->ctxt);
+		redis->ctxt = NULL;
 	}
-	return -1;
+	return NULL;
 }
 
 static int __redis_select_db(redisContext *ctxt, int db)
