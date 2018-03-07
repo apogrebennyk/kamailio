@@ -35,7 +35,7 @@ static void __async_connect_cb(const redisAsyncContext *c, int status);
 static void __async_disconnect_cb(const redisAsyncContext *c, int status);
 static void __subscription_cb(redisAsyncContext *c, void *r, void *privdata);
 static struct redis *__redis_connect_async(struct redis *redis);
-static struct redis *__alloc_redis(char *ip, int port, int db);
+static struct redis *__alloc_redis(char *ip, int port, int db, char *password);
 static void __redis_subscribe_to_kill_list(struct redis *redis);
 
 
@@ -141,7 +141,7 @@ error:
 	return -1;
 }
 
-static struct redis *__alloc_redis(char *ip, int port, int db)
+static struct redis *__alloc_redis(char *ip, int port, int db, char *password)
 {
 	struct redis *redis = pkg_malloc(sizeof(struct redis));
 	int len = strlen(ip);
@@ -153,22 +153,27 @@ static struct redis *__alloc_redis(char *ip, int port, int db)
 	redis->db = db;
 	redis->ctxt = NULL;
 
+	len = strlen(password);
+
+	redis->password = pkg_malloc(len + 1);
+	strcpy(redis->password, password);
+
 	return redis;
 }
 
-struct redis *redis_connect_all(char *ip, int port, int db)
+struct redis *redis_connect_all(char *ip, int port, int db, char *password)
 {
-	return __redis_connect_async(__redis_connect(__alloc_redis(ip, port, db)));
+	return __redis_connect_async(__redis_connect(__alloc_redis(ip, port, db, password)));
 }
 
-struct redis *redis_connect(char *ip, int port, int db)
+struct redis *redis_connect(char *ip, int port, int db, char *password)
 {
-	return __redis_connect(__alloc_redis(ip, port, db));
+	return __redis_connect(__alloc_redis(ip, port, db, password));
 }
 
-struct redis *redis_connect_async(char *ip, int port, int db)
+struct redis *redis_connect_async(char *ip, int port, int db, char *password)
 {
-	return __redis_connect_async(__alloc_redis(ip, port, db));
+	return __redis_connect_async(__alloc_redis(ip, port, db, password));
 }
 
 static struct redis *__redis_connect_async(struct redis *redis)
@@ -189,6 +194,9 @@ static struct redis *__redis_connect_async(struct redis *redis)
 	redisAsyncSetConnectCallback(redis->async_ctxt, __async_connect_cb);
 	redisAsyncSetDisconnectCallback(redis->async_ctxt, __async_disconnect_cb);
 
+	if(strlen(redis->password) > 0) {
+		redisAsyncCommand(redis->async_ctxt, NULL, NULL, "AUTH %s", redis->password);
+	}
 	redisAsyncCommand(redis->async_ctxt, NULL, NULL, "SELECT %d", redis->db);
 	__redis_subscribe_to_kill_list(redis);
 
@@ -218,10 +226,32 @@ static struct redis *__redis_connect(struct redis *redis)
 		return NULL;
 	}
 
+	if(strlen(redis->password) > 0) {
+		redisReply *reply = redisCommand(redis->ctxt, "AUTH %s", redis->password);
+		if (!reply) {
+			LM_ERR("cannot authenticate connection\n");
+			goto err;
+		}
+		if (reply->type == REDIS_REPLY_ERROR) {
+			LM_ERR("cannot authenticate connection: %s\n", reply->str);
+			goto err;
+		}
+		freeReplyObject(reply); reply = NULL;
+	}
 	if(!__redis_select_db(redis->ctxt, redis->db))
 		return NULL;
 
 	return redis;
+
+err:
+	if (reply)
+		freeReplyObject(reply);
+	reply = NULL;
+	if (con->con) {
+		redisFree(con->con);
+		con->con = NULL;
+	}
+	return -1;
 }
 
 static int __redis_select_db(redisContext *ctxt, int db)

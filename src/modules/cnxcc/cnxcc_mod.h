@@ -142,6 +142,7 @@ typedef struct data
 		char host[40];
 		int port;
 		int db;
+		char password[40];
 	} redis_cnn_info;
 	struct redis *redis;
 

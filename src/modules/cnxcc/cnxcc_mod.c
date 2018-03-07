@@ -350,9 +350,10 @@ static int __mod_init(void)
 			*chr = ' ';
 
 	memset(_data.redis_cnn_info.host, 0, sizeof(_data.redis_cnn_info.host));
-	sscanf(_data.redis_cnn_str.s, "addr=%s port=%d db=%d",
+	memset(_data.redis_cnn_info.password, 0, sizeof(_data.redis_cnn_info.password));
+	sscanf(_data.redis_cnn_str.s, "addr=%s port=%d db=%d password=%s",
 			_data.redis_cnn_info.host, &_data.redis_cnn_info.port,
-			&_data.redis_cnn_info.db);
+			&_data.redis_cnn_info.db, _data.redis_cnn_info.password);
 
 	len = strlen(_data.redis_cnn_info.host);
 	//
@@ -373,9 +374,9 @@ static int __mod_init(void)
 		return -1;
 	}
 
-	LM_INFO("Redis connection info: ip=[%s], port=[%d], database=[%d]",
+	LM_INFO("Redis connection info: ip=[%s], port=[%d], database=[%d], password=[%s]",
 			_data.redis_cnn_info.host, _data.redis_cnn_info.port,
-			_data.redis_cnn_info.db);
+			_data.redis_cnn_info.db, _data.redis_cnn_info.password);
 
 	register_procs(3 /* 2 timers + 1 redis async receiver */);
 	return 0;
@@ -390,7 +391,8 @@ static int __child_init(int rank)
 			return 0;
 
 		_data.redis = redis_connect(_data.redis_cnn_info.host,
-				_data.redis_cnn_info.port, _data.redis_cnn_info.db);
+				_data.redis_cnn_info.port, _data.redis_cnn_info.db,
+				_data.redis_cnn_info.password);
 		return (!_data.redis) ? -1 : 0;
 	}
 
@@ -422,7 +424,8 @@ static int __child_init(int rank)
 		return -1;
 	} else if(pid == 0) {
 		_data.redis = redis_connect_async(_data.redis_cnn_info.host,
-				_data.redis_cnn_info.port, _data.redis_cnn_info.db);
+				_data.redis_cnn_info.port, _data.redis_cnn_info.db,
+				_data.redis_cnn_info.password);
 
 		return (!_data.redis) ? -1 : 0;
 		;

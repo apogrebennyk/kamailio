@@ -35,14 +35,15 @@ struct redis
 	int db;
 	short port;
 	char *ip;
+	char *password;
 	redisContext *ctxt;
 	redisAsyncContext *async_ctxt;
 	struct event_base *eb;
 };
 
-struct redis *redis_connect(char *ip, int port, int db);
-struct redis *redis_connect_async(char *ip, int port, int db);
-struct redis *redis_connect_all(char *ip, int port, int db);
+struct redis *redis_connect(char *ip, int port, int db, char *password);
+struct redis *redis_connect_async(char *ip, int port, int db, char *password);
+struct redis *redis_connect_all(char *ip, int port, int db, char *password);
 int redis_get_int(credit_data_t *credit_data, const char *instruction,
 		const char *key, int *value);
 int redis_get_str(credit_data_t *credit_data, const char *instruction,
